@@ -1,16 +1,14 @@
 //gcc-5 -fopenmp -O3 viho.c -I/usr/local/include/libiomp -I/usr/X11/include -I/Users/Hhhh/ENS/Stage_L3_math/homographies/code/jpeg-6b -L/usr/X11/lib -lfftw3 -lX11 -L/usr/local/Cellar/libtiff/4.0.3 -ltiff -ljpeg -lpng
 
 
-#include "iio.c"
+#include <assert.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
-#include "decomp.h"
 #include <time.h>
 
-#define WOUT 512
-#define HOUT 512
-
+#include "decomp.h"
 
 
 
@@ -95,7 +93,8 @@ void homography_from_four_points(double H[3][3], double x[2], double y[2], doubl
 }
 
 // Find the homography that moves the four points (x,y,z,t) to (a,b,c,d)
-void homography_from_eight_points(double H[3][3], double x[2], double y[2], double z[2], double w[2], double a[2], double b[2], double c[2], double d[2]){
+void homography_from_eight_points(double H[3][3], double x[2], double y[2], double z[2], double w[2], double a[2], double b[2], double c[2], double d[2])
+{
 	double H1[3][3], H2[3][3], iH1[3][3];
 	homography_from_four_points(H1, x, y, z, w);
 	homography_from_four_points(H2, a, b, c, d);
@@ -103,70 +102,126 @@ void homography_from_eight_points(double H[3][3], double x[2], double y[2], doub
 	compose_homographies(H, H2, iH1);
 }
 
+static float getsample_0(float *x, int w, int h, int pd, int i, int j, int l)
+{
+	if (i < 0 || j < 0 || i >= w || j >= h)
+		return 0;
+	if (l < 0) l = 0;
+	if (l >= pd) l = pd - 1;
+	return x[(w*j+i)*pd+l];
+}
+
+// ultra-naive warp
+static void warp_homography_nn(float *y, int yw, int yh, double H[3][3],
+		float *x, int w, int h, int pd)
+{
+	//double invH[3][3];
+	//invert_homography(invH, H);
+
+	fprintf(stderr, "yw = %d\n", yw);
+	fprintf(stderr, "yh = %d\n", yh);
+	fprintf(stderr, "w = %d\n", w);
+	fprintf(stderr, "h = %d\n", h);
+
+	for (int j = 0; j < yh; j++)
+	for (int i = 0; i < yw; i++)
+	for (int l = 0; l < pd; l++)
+	{
+		double ypos[2] = {i, j};
+		double xpos[2]; apply_homography(xpos, H, ypos);
+		int ii = round(xpos[0]-0.5);
+		int jj = round(xpos[1]+0.5);
+		int idx = (j * yw + i) * pd + l;
+		y[idx] = getsample_0(x, w, h, pd, ii, jj, l);
+	}
+}
+
+static void warp_homography(float *img, float *img_f, int w, int h, int pd,
+		int WOUT, int HOUT, double H[3][3], int method_id)
+{
+	if (method_id == 1) { // decomposition method
+		if (pd == 3) {
+			apply_homo_final(img,img_f,w,h,WOUT,HOUT,H);
+		} else { //suppose pd=1
+			assert(pd == 1);
+			float *img3 = malloc(3*w*h*sizeof(float));
+			for(int i=0;i<w*h;i++){
+				for(int l = 0;l<3;l++){
+					img3[3*i+l] = img[i];
+				}
+			}
+			apply_homo_final(img3,img_f,w,h,WOUT,HOUT,H);
+		}
+	} else if (method_id == 0) { // nearest neighbor interpolation
+		warp_homography_nn(img_f, WOUT, HOUT, H, img, w, h, pd);
+	} else
+		exit(fprintf(stderr,"unrecognized method_id %d\n", method_id));
+}
 
 
-int main(int argc,char *argv[]){
-	if (argc != 18) {
-		printf("usage :\n\t[image.png] x0 x1 y0 y1 z0 z1 t0 t1 a0 a1 b0 b1 c0 c1 d0 d1\n");
+#include "iio.c"
+#include "pickopt.c"
+int main(int argc,char *argv[])
+{
+	int method_id = atoi(pick_option(&argc, &argv, "m", "0"));
+	if (argc != 21) {
+		fprintf(stderr, "usage:\n\t%s i.png o.png w h "
+		//                          0 1     2     3 4
+			"x0 x1 y0 y1 z0 z1 t0 t1 a0 a1 b0 b1 c0 c1 d0 d1\n",
+		//       5  6  7  8  9  10 11 12 13 14 15 16 17 18 19 20
+			*argv);
 		return 1;
 	}
 
-
-
-	//image input
+	// read input parameters
 	char *filename_in = argv[1];
-	float *img;
+	char *filename_out = argv[2];
+	int WOUT = atoi(argv[3]);
+	int HOUT = atoi(argv[4]);
+	double from[4][2], to[4][2];
+	for (int i = 0; i < 4; i++)
+	for (int j = 0; j < 2; j++)
+	{
+		from[i][j] = atof(argv[5  + 2*i + j]);
+		to[i][j]   = atof(argv[13 + 2*i + j]);
+	}
+
+	// compute the coefficients of the requested homography
+	// note: apply_homo_final resamples by the inverse homography
+	double H[3][3];
+	homography_from_eight_points(H,
+			from[0], from[1], from[2], from[3],
+			to[0], to[1], to[2], to[3]
+			);
+
+	// read input image
 	int w,h,pd;
-	img = iio_read_image_float_vec(filename_in, &w, &h, &pd);
+	float *img = iio_read_image_float_vec(filename_in, &w, &h, &pd);
+
+	// allocate space for output image
 	float *img_f = malloc(3*WOUT*HOUT*sizeof(float));
 
-
-
-	//homography input
-	double x[2] = {strtod(argv[2],NULL), strtod(argv[3],NULL)},
-        y[2] = {strtod(argv[4],NULL), strtod(argv[5],NULL)},
-        z[2] = {strtod(argv[6],NULL), strtod(argv[7],NULL)},
-        t[2] = {strtod(argv[8],NULL), strtod(argv[9],NULL)},
-        a[2] = {strtod(argv[10],NULL), strtod(argv[11],NULL)},
-        b[2] = {strtod(argv[12],NULL), strtod(argv[13],NULL)},
-        c[2] = {strtod(argv[14],NULL), strtod(argv[15],NULL)},
-        d[2] = {strtod(argv[16],NULL), strtod(argv[17],NULL)};
-	double H[3][3];
-	homography_from_eight_points(H,a,b,c,d,x,y,z,t);
-	//this H is such that H(a)=x, H(b)=y,...
-	//but apply_homo_final resamples by the inverse homography
-
-
-
-    //resample (and time)
+	// start timer
 	clock_t debutcpu,fincpu;
 	double debutreal,finreal;
 	debutcpu = clock();
 	debutreal = omp_get_wtime();
-	if(pd==3){
-        apply_homo_final(img,img_f,w,h,WOUT,HOUT,H);
-	}else{//suppose pd=1
-        float *img3 = malloc(3*w*h*sizeof(float));
-        for(int i=0;i<w*h;i++){
-            for(int l = 0;l<3;l++){
-                img3[3*i+l]=img[i];
-            }
-        }
-        apply_homo_final(img3,img_f,w,h,WOUT,HOUT,H);
-	}
 
+	// call the actual algorithm
+	warp_homography(img, img_f, w, h, pd, WOUT, HOUT, H, method_id);
+
+	// stop timer and print the running time
 	fincpu = clock();
 	finreal = omp_get_wtime();
-	printf("cputime :%fs\ntime : %fs\n",(double)(fincpu-debutcpu)/CLOCKS_PER_SEC,(double)(finreal-debutreal));
+	fprintf(stderr, "cputime :%fs\ntime : %fs\n",
+			(double)(fincpu-debutcpu)/CLOCKS_PER_SEC,
+			(double)(finreal-debutreal));
 
+	// save output image
+	iio_save_image_float_vec(filename_out ,img_f, WOUT, HOUT, 3);
 
-
-	//output
-	iio_save_image_float_vec("img_f.png",img_f,WOUT,HOUT,3);
+	// cleanup and exit
 	free(img);
 	free(img_f);
-
-
-
 	return 0;
 }
