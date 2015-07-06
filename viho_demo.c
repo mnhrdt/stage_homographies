@@ -102,46 +102,193 @@ void homography_from_eight_points(double H[3][3], double x[2], double y[2], doub
 	compose_homographies(H, H2, iH1);
 }
 
-static float getsample_0(float *x, int w, int h, int pd, int i, int j, int l)
+// type of the "extrapolator" functions
+typedef float (*extrapolator_t)(float*,int,int,int,int,int,int);
+
+// auxiliary function: compute n%p correctly, even for huge and negative numbers
+static int good_modulus(int n, int p)
 {
-	if (i < 0 || j < 0 || i >= w || j >= h)
-		return 0;
-	if (l < 0) l = 0;
-	if (l >= pd) l = pd - 1;
-	return x[(w*j+i)*pd+l];
+	int r = n % p;
+	r = r < 0 ? r + p : r;
+	assert(r >= 0);
+	assert(r < p);
+	return r;
 }
 
-// ultra-naive warp
-static void warp_homography_nn(float *y, int yw, int yh, double H[3][3],
-		float *x, int w, int h, int pd)
+// instance of "extrapolator_t", extrapolate by periodicity
+static float getsample_per(float *x, int w, int h, int pd, int i, int j, int l)
 {
-	//double invH[3][3];
-	//invert_homography(invH, H);
+	i = good_modulus(i, w);
+	j = good_modulus(j, h);
+	if (l >= pd)
+		l = pd - 1;
+	return x[(i+j*w)*pd + l];
+}
 
-	fprintf(stderr, "yw = %d\n", yw);
-	fprintf(stderr, "yh = %d\n", yh);
-	fprintf(stderr, "w = %d\n", w);
-	fprintf(stderr, "h = %d\n", h);
+// instance of "extrapolator_t", extrapolate by a constant value
+static float getsample_cons(float *x, int w, int h, int pd, int i, int j, int l)
+{
+	static float value = 0;
+	if (w == 0 && h == 0)
+		value = *x;
+	if (i < 0 || i >= w || j < 0 || j >= h)
+		return value;
+	if (l >= pd)
+		l = pd - 1;
+	return x[(i+j*w)*pd + l];
+}
+
+
+// type of the "interpolator" functions
+typedef float (*interpolator_t)(float*,int,int,int,float,float,int,
+		extrapolator_t);
+
+// auxiliary function for bilinear interpolation
+static float evaluate_bilinear_cell(float a, float b, float c, float d,
+							float x, float y)
+{
+	return a * (1-x) * (1-y)
+	     + b * ( x ) * (1-y)
+	     + c * (1-x) * ( y )
+	     + d * ( x ) * ( y );
+}
+
+// instance of "interpolator_t", for bilinear interpolation
+static float bilinear_interpolation_at(float *x, int w, int h, int pd,
+		float p, float q, int l, extrapolator_t pix)
+{
+	int ip = floor(p);
+	int iq = floor(q);
+	float a = pix(x, w, h, pd, ip  , iq  , l);
+	float b = pix(x, w, h, pd, ip+1, iq  , l);
+	float c = pix(x, w, h, pd, ip  , iq+1, l);
+	float d = pix(x, w, h, pd, ip+1, iq+1, l);
+	return evaluate_bilinear_cell(a, b, c, d, p-ip, q-iq);
+}
+
+// instance of "interpolator_t" for nearest neighbor interpolation
+static float nearest_neighbor_at(float *x, int w, int h, int pd,
+		float p, float q, int l, extrapolator_t pix)
+{
+	int ip = round(p);
+	int iq = round(q);
+	return pix(x, w, h, pd, ip, iq, l);
+}
+
+
+// one-dimensional cubic interpolation of four data points ("Keys")
+static float cubic_interpolation(float v[4], float x)
+{
+	return v[1] + 0.5 * x*(v[2] - v[0]
+			+ x*(2.0*v[0] - 5.0*v[1] + 4.0*v[2] - v[3]
+			+ x*(3.0*(v[1] - v[2]) + v[3] - v[0])));
+}
+
+// two-dimensional separable cubic interpolation, on a 4x4 grid
+static float bicubic_interpolation_cell(float p[4][4], float x, float y)
+{
+	float v[4];
+	v[0] = cubic_interpolation(p[0], y);
+	v[1] = cubic_interpolation(p[1], y);
+	v[2] = cubic_interpolation(p[2], y);
+	v[3] = cubic_interpolation(p[3], y);
+	return cubic_interpolation(v, x);
+}
+
+// instance of "interpolator_t" for bicubic interpolation
+static float bicubic_interpolation_at(float *img, int w, int h, int pd,
+		float x, float y, int l, extrapolator_t p)
+{
+	x -= 1;
+	y -= 1;
+
+	int ix = floor(x);
+	int iy = floor(y);
+	float c[4][4];
+	for (int j = 0; j < 4; j++)
+		for (int i = 0; i < 4; i++)
+			c[i][j] = p(img, w, h, pd, ix + i, iy + j, l);
+	return bicubic_interpolation_cell(c, x - ix, y - iy);
+}
+
+static extrapolator_t obtain_extrapolator(int id)
+{
+	if (id == -1)
+		return getsample_per;
+	float top = id;
+	getsample_cons(&top, 0, 0, 0, 0, 0, 0);
+	return getsample_cons;
+}
+
+static interpolator_t obtain_interpolator(int id)
+{
+	if (id == 0) return nearest_neighbor_at;
+	if (id == 2) return bilinear_interpolation_at;
+	if (id == 3) return bicubic_interpolation_at;
+	return nearest_neighbor_at;
+}
+
+static void warp_homography_generic(float *y, int yw, int yh, double H[3][3],
+		float *x, int w, int h, int pd,
+		int extrapolator, int interpolator)
+{
+	extrapolator_t OUT  = obtain_extrapolator(extrapolator);
+	interpolator_t EVAL = obtain_interpolator(interpolator);
 
 	for (int j = 0; j < yh; j++)
 	for (int i = 0; i < yw; i++)
+	{
+		double p[2] = {i, j};
+		apply_homography(p, H, p);
+		p[0] = p[0] * w / (w - 1.0) - 0.5;
+		p[1] = p[1] * h / (h - 1.0) - 0.5;
+		for (int l = 0; l < pd; l++)
+		{
+			int idx = l + pd * (yw * j + i);
+			float v = EVAL(x, w, h, pd, p[0], p[1], l, OUT);
+			y[idx] = v;
+		}
+	}
+}
+
+static bool insideP(int w, int h, int i, int j)
+{
+	return i >= 0 && j >= 0 && i < w && j < h;
+}
+
+// draw the sample positions
+static void warp_homography_dots(float *y, int yw, int yh, double H[3][3],
+		float *x, int w, int h, int pd)
+{
+	double invH[3][3];
+	invert_homography(invH, H);
+
+	// fill background
+	for (int i = 0; i < yw * yh * pd; i++)
+		y[i] = 0;
+
+	// traverse samples
+	for (int j = 0; j < h; j++)
+	for (int i = 0; i < w; i++)
 	for (int l = 0; l < pd; l++)
 	{
-		double ypos[2] = {i, j};
-		double xpos[2]; apply_homography(xpos, H, ypos);
-		int ii = round(xpos[0]-0.5);
-		int jj = round(xpos[1]+0.5);
-		int idx = (j * yw + i) * pd + l;
-		y[idx] = getsample_0(x, w, h, pd, ii, jj, l);
+		double xpos[2] = {i, j};
+		double ypos[2]; apply_homography(ypos, invH, xpos);
+		int ii = round(ypos[0]);
+		int jj = round(ypos[1]);
+		int xidx = (j * w + i) * pd + l;
+		int yidx = (jj * yw + ii) * pd + l;
+		if (insideP(yw, yh, ii, jj))
+			y[yidx] = x[xidx];
 	}
 }
 
 static void warp_homography(float *img, float *img_f, int w, int h, int pd,
-		int WOUT, int HOUT, double H[3][3], int method_id)
+		int ow, int oh, double H[3][3], int method_id)
 {
 	if (method_id == 1) { // decomposition method
 		if (pd == 3) {
-			apply_homo_final(img,img_f,w,h,WOUT,HOUT,H);
+			apply_homo_final(img,img_f,w,h,ow,oh,H);
 		} else { //suppose pd=1
 			assert(pd == 1);
 			float *img3 = malloc(3*w*h*sizeof(float));
@@ -150,10 +297,16 @@ static void warp_homography(float *img, float *img_f, int w, int h, int pd,
 					img3[3*i+l] = img[i];
 				}
 			}
-			apply_homo_final(img3,img_f,w,h,WOUT,HOUT,H);
+			apply_homo_final(img3,img_f,w,h,ow,oh,H);
 		}
+	} else if (method_id == -1) { // positions of the samples
+		warp_homography_dots(img_f, ow, oh, H, img, w, h, pd);
 	} else if (method_id == 0) { // nearest neighbor interpolation
-		warp_homography_nn(img_f, WOUT, HOUT, H, img, w, h, pd);
+		warp_homography_generic(img_f, ow,oh, H, img, w,h,pd, 0, 1);
+	} else if (method_id == 2) { // bilinear interpolation
+		warp_homography_generic(img_f, ow,oh, H, img, w,h,pd, 0, 2);
+	} else if (method_id == 3) { // bicubic interpolation
+		warp_homography_generic(img_f, ow,oh, H, img, w,h,pd, 0, 3);
 	} else
 		exit(fprintf(stderr,"unrecognized method_id %d\n", method_id));
 }
@@ -165,7 +318,7 @@ int main(int argc,char *argv[])
 {
 	int method_id = atoi(pick_option(&argc, &argv, "m", "0"));
 	if (argc != 21) {
-		fprintf(stderr, "usage:\n\t%s i.png o.png w h "
+		fprintf(stderr, "usage:\n%s in.png out.png w h "
 		//                          0 1     2     3 4
 			"x0 x1 y0 y1 z0 z1 t0 t1 a0 a1 b0 b1 c0 c1 d0 d1\n",
 		//       5  6  7  8  9  10 11 12 13 14 15 16 17 18 19 20
