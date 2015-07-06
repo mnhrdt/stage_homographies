@@ -1,0 +1,11 @@
+<%include file="header.html" />
+
+<form action="${app.base_url + 'wait'}" method="get">
+  <input type="hidden" name="key" value="${app.key}">
+  <p>Run the over the following image: <input type="submit" name="action" value="run" /><p/>
+
+<img src="${app.work_url + 'input_0.png'}" />
+
+</form>
+
+<%include file="footer.html" />

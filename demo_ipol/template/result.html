@@ -1,0 +1,130 @@
+<%include file="header.html" />
+
+<%
+    cahash="?q="+str(app.cfg['param'])
+    canvas_w=app.cfg['param']['ow']
+    canvas_h=app.cfg['param']['oh']
+%>
+
+<hr />
+
+<h2>Preview</h2>
+
+
+%if app.cfg['param']['state'] == "plain":
+<p>Select one of the four corners</p>
+%else:
+<p style="color:red">Click on the desired position of the red point</p>
+%endif
+
+<form action="${app.base_url + 'click'}" method="get">
+	<input type="hidden" name="key" value="${app.key}" />
+	<div style="font-size:x-small;">
+		<!--
+Coordinates to move: 
+<input type="radio" name="what_to_move" value="c" checked="checked" />
+input
+&nbsp;
+&nbsp;
+<input type="radio" name="what_to_move" value="p" />
+output
+</div>
+-->
+<div style="position:relative">
+	<img
+	src="${app.work_url + "o_nn.png"}${cahash}"
+	width="${canvas_w}" height="${canvas_h}" 
+	/>
+	<input type="image" name="canvas"
+	src="${app.work_url + "dots.png"}${cahash}"
+	style="position:absolute;top:0;left:0"
+	width="${canvas_w}" height="${canvas_h}" 
+	/>
+</div>
+</form>
+
+<div>
+<form action="${app.base_url + 'reset'}" method="get" >
+	<input type="hidden" name="key" value="${app.key}" />
+<input type="submit" value="reset view" style="font-size:xx-small;" />
+</form>
+</div>
+
+
+<!--
+<pre>
+${app.cfg}
+</pre>
+-->
+
+<!--
+<div class="gallery" style="height:${height}px">
+  <ul class="index">
+    <li> <a href="#">input <span>
+          <img src="${app.work_url + "input_0.png"}" alt="input" />
+        </span> </a> </li>
+    <li> <a href="#">dots <span>
+          <img src="${app.work_url + "dots.png"}" alt="output" />
+        </span> </a> </li>
+  </ul>
+</div>
+-->
+
+<h2>Result</h2>
+
+%if app.cfg['param']['has_gallery'] == "gallery_old":
+<div>
+<form action="${app.base_url + 'rerun'}" method="get">
+	<input type="hidden" name="key" value="${app.key}">
+<input type="submit" value="update from preview">
+</form>
+</div>
+%endif
+
+
+%if app.cfg['param']['has_gallery'] == "gallery_new":
+
+<%def name="visual(file,title)">
+  <li>
+    <a href="#">${title}
+      <span>
+        <img src="${app.work_url + file}${cahash}" alt="output" />
+      </span>
+    </a>
+  </li>
+</%def>
+
+
+<div class="gallery" style="height:${canvas_w}px">
+  <ul class="index">
+    ${visual("out_final.png", "decomposition")}
+    ${visual("out_bic.png", "bicubic")}
+    ${visual("out_bil.png", "bilinear")}
+    ${visual("out_nn.png", "nearest")}
+    ${visual("out_ndots.png", "samples")}
+  </ul>
+</div>
+
+<p>
+  The "decomposition" algorithm ran in ${"%0.2f" % app.cfg['info']['run_time']}s.
+</p>
+
+
+%endif
+
+
+<!--
+<p> end of content </p>
+-->
+
+
+<hr />
+<%include file="archive_info.html" />
+
+<div> &nbsp; </div>
+<div> &nbsp; </div>
+<div> &nbsp; </div>
+<div> &nbsp; </div>
+
+
+<%include file="footer.html" />
