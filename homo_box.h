@@ -3,6 +3,9 @@
 #include <math.h>
 #include <omp.h>
 
+static double global_ZOOM_INPUT 0.7
+static double global_ZOOM_INPUT 0.7
+
 /**
   * the program homo_box use the fourth integral image to interpol an image by a piecewise affine function
   * and to convolve this function with the filter g3 (convolution of 3 boxes of width D)
@@ -80,7 +83,7 @@ float convolve_img(float *img,double *Img,double xy,float d,int wh){
   */
     //limit standard deviation to avoid numerical problems
         //when convolving with too small gaussian
-    double d_aux = 0.64*pow(d,2)-0.49;
+    double d_aux = pow(global_ZOOM_OUTPUT,2)*pow(d,2)-pow(global_ZOOM_INPUT,2);
     if(d_aux<0.001){d_aux=0.001;}
     double D = 2*sqrt(d_aux);
 

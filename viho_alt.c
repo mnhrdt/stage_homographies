@@ -15,7 +15,7 @@
 int main(int argc,char *argv[]){
 
 	if (argc != 11) {
-		printf("usage : [image.png] a b p c d q r s t"); 
+		printf("usage : [image.png] a b p c d q r s t\n"); 
 		return 1;
 	}
 	
