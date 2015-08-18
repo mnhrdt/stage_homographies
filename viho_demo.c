@@ -318,7 +318,9 @@ static void warp_homography(float *img, float *img_f, int w, int h, int pd,
 #include "pickopt.c"
 int main(int argc,char *argv[])
 {
-	int method_id = atoi(pick_option(&argc, &argv, "m", "0"));
+	int method_id      = atoi(pick_option(&argc, &argv, "m", "0"));
+	global_ZOOM_INPUT  = atoi(pick_option(&argc, &argv, "s", "0.7"));
+	global_ZOOM_OUTPUT = atoi(pick_option(&argc, &argv, "S", "0.7"));
 	if (argc != 21) {
 		fprintf(stderr, "usage:\n%s in.png out.png w h "
 		//                          0 1     2     3 4
