@@ -188,7 +188,7 @@ int apply_homo(float *img,float *img_f,int w,int h,int w_f,int h_f,int mu,int nu
             for(int i=0;i<w;i++){imgw[i] = img[3*(i+j*w)+l];} //extract the column
             build_fourth_int(imgw,Img,w);
 
-			#pragma omp parallel for
+			#pragma omp parallel for schedule(static,1)
 			for(int i=0;i<w_aux;i++){
 				float x = (float) (i+mu_aux);
                 float d = fabs((H[0]*H[8]-H[6]*H[2])/pow(H[6]*x+H[8],2)); //derivative with respect to x
@@ -208,7 +208,7 @@ int apply_homo(float *img,float *img_f,int w,int h,int w_f,int h_f,int mu,int nu
 			float x =(float) (i+mu_f);
 			float d = fabs(H[4]/(H[6]*x+H[8])); //derivative with respect to y (does not depend on y)
 
-			#pragma omp parallel for
+			#pragma omp parallel for schedule(static,1)
 			for(int j=0;j<h_f;j++){
 				float y = (float) (j+nu_f);
 				y = (H[4]*y+H[5])/(H[6]*x+H[8]) - (float) nu_aux; //apply the homography

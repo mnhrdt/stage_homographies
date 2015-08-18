@@ -363,7 +363,7 @@ int main(int argc,char *argv[])
 	debutreal = omp_get_wtime();
 
 	// call the actual algorithm
-	omp_set_num_threads(4);
+	omp_set_num_threads(16);
 	warp_homography(img, img_f, w, h, pd, WOUT, HOUT, H, method_id);
 
 	// stop timer and print the running time
