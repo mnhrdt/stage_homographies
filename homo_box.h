@@ -3,8 +3,8 @@
 #include <math.h>
 #include <omp.h>
 
-static double global_ZOOM_INPUT=0.7;
-static double global_ZOOM_OUTPUT=0.7;
+static double global_ZOOM_INPUT=0.6;
+static double global_ZOOM_OUTPUT=0.6;
 
 /**
   * the program homo_box use the fourth integral image to interpol an image by a piecewise affine function
