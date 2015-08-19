@@ -1,4 +1,4 @@
-//gcc-5 -fopenmp -O3 viho.c -I/usr/local/include/libiomp -I/usr/X11/include -I/Users/Hhhh/ENS/Stage_L3_math/homographies/code/jpeg-6b -L/usr/X11/lib -lfftw3 -lX11 -L/usr/local/Cellar/libtiff/4.0.3 -ltiff -ljpeg -lpng
+//gcc -std=c99 -fopenmp -O3 viho_demo.c -lfftw3 -ltiff -ljpeg -lpng
 
 
 #include <assert.h>

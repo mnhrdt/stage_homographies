@@ -191,7 +191,7 @@ int apply_rh(float *img1,float *img2,int w,int h,double xc_i,double yc_i,double 
 	}
 
 	//convolve
-	#pragma omp parallel for
+	#pragma omp parallel for schedule(static,1)
 	for(int j=0;j<h;j++){
 		for(int i=0;i<w;i++){
 		double x = i;
@@ -243,7 +243,7 @@ int apply_rv(float *img1,float *img2,int w,int h,double xc_i,double yc_i,double 
 	}
 
     //convolve
-	#pragma omp parallel for
+	#pragma omp parallel for schedule(static,1)
 	for(int j=0;j<h;j++){
 		double y = j;
 		for(int i=0;i<w;i++){

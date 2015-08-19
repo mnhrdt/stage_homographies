@@ -3,8 +3,8 @@
 #include <math.h>
 #include <omp.h>
 
-static double global_ZOOM_INPUT 0.7
-static double global_ZOOM_INPUT 0.7
+static double global_ZOOM_INPUT=0.7;
+static double global_ZOOM_OUTPUT=0.7;
 
 /**
   * the program homo_box use the fourth integral image to interpol an image by a piecewise affine function
@@ -193,7 +193,7 @@ int apply_homo(float *img,float *img_f,int w,int h,int w_f,int h_f,int mu,int nu
 
 			#pragma omp parallel for schedule(static,1)
 			for(int i=0;i<w_aux;i++){
-				float x = (float) (i+mu_aux+1/2);
+				float x = (float) (i+mu_aux+0.5);
                 float d = fabs((H[0]*H[8]-H[6]*H[2])/pow(H[6]*x+H[8],2)); //derivative with respect to x
 
 				x = (H[0]*x+H[2])/(H[6]*x+H[8]) - (float) mu; //apply the homography
@@ -208,12 +208,12 @@ int apply_homo(float *img,float *img_f,int w,int h,int w_f,int h_f,int mu,int nu
             for(int j=0;j<h_aux;j++){img_auxh[j] = img_aux[i+j*w_aux];} //extract the line
             build_fourth_int(img_auxh,Img_aux,h_aux);
 
-			float x =(float) (i+mu_f+1/2);
+			float x =(float) (i+mu_f+0.5);
 			float d = fabs(H[4]/(H[6]*x+H[8])); //derivative with respect to y (does not depend on y)
 
 			#pragma omp parallel for schedule(static,1)
 			for(int j=0;j<h_f;j++){
-				float y = (float) (j+nu_f+1/2);
+				float y = (float) (j+nu_f+0.5);
 				y = (H[4]*y+H[5])/(H[6]*x+H[8]) - (float) nu_aux; //apply the homography
 				img_aux2[i+j*w_f] = convolve_img(img_auxh,Img_aux,y,d,h_aux);
 
