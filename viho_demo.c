@@ -240,8 +240,8 @@ static void warp_homography_generic(float *y, int yw, int yh, double H[3][3],
 	{
 		double p[2] = {i, j};
 		apply_homography(p, H, p);
-		p[0] += 1.0;
-		p[1] += 1.0;
+		//p[0] += 1.0;
+		//p[1] += 1.0;
 		//p[0] = p[0] * w / (w - 1.0) - 0.5;
 		//p[1] = p[1] * h / (h - 1.0) - 0.5;
 		for (int l = 0; l < pd; l++)
