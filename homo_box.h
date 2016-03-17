@@ -21,25 +21,25 @@ void build_fourth_int(float *img,double *Img,int wh){
   *         will contain 1-, 2-, 3- and 4-integral of img on points 0..wh
   *         suppose img is piecewise constant
   */
-    //initialize values of integral images at 0 on 0
-    Img[0] = 0;
-    Img[wh+1] = 0;
-    Img[2*wh+2] = 0;
-    Img[3*wh+3] = 0;
+	//initialize values of integral images at 0 on 0
+	Img[0] = 0;
+	Img[wh+1] = 0;
+	Img[2*wh+2] = 0;
+	Img[3*wh+3] = 0;
 
-    int u;
-    double q,l;
-    for(u=1;u<wh+1;u++){
-        q = (double) img[u-1];
-        //first integral (indexed from 0 to wh)
-        Img[u] = Img[u-1] +  q;
-        //second integral (indexed from wh+1 to 2*wh+1)
-        Img[u+wh+1] = Img[u+wh] + Img[u-1] + q/2;
-        //third integral (indexed from 2*wh+2 to 3*wh+2)
-        Img[u+2*wh+2] = Img[u+2*wh+1] + Img[wh+u] + Img[u-1]/2 + q/6;
-        //fourth integral (indexed from 3*wh+3 to 4*wh+3)
-        Img[u+3*wh+3] = Img[u+3*wh+2] + Img[2*wh+1+u] + Img[wh+u]/2 + Img[u-1]/6 + q/24;
-    }
+	int u;
+	double q,l;
+	for(u=1;u<wh+1;u++){
+		q = (double) img[u-1];
+		//first integral (indexed from 0 to wh)
+		Img[u] = Img[u-1] +  q;
+		//second integral (indexed from wh+1 to 2*wh+1)
+		Img[u+wh+1] = Img[u+wh] + Img[u-1] + q/2;
+		//third integral (indexed from 2*wh+2 to 3*wh+2)
+		Img[u+2*wh+2] = Img[u+2*wh+1] + Img[wh+u] + Img[u-1]/2 + q/6;
+		//fourth integral (indexed from 3*wh+3 to 4*wh+3)
+		Img[u+3*wh+3] = Img[u+3*wh+2] + Img[2*wh+1+u] + Img[wh+u]/2 + Img[u-1]/6 + q/24;
+	}
 }
 
 //evaluate integral images
@@ -81,26 +81,25 @@ float convolve_img(float *img,double *Img,double xy,float d,int wh){
   *     d : zoom factor (determining standard deviation of g3)
   *     D : size of the box functions defining g3
   */
-    //limit standard deviation to avoid numerical problems
-        //when convolving with too small gaussian
-    double d_aux = pow(global_ZOOM_OUTPUT,2)*pow(d,2)-pow(global_ZOOM_INPUT,2);
+    //limit standard deviation D to avoid numerical problems when convolving with too small gaussian
+    double d_aux = 0.64*pow(d,2)-0.49;
     if(d_aux<0.001){d_aux=0.001;}
     double D = 2*sqrt(d_aux);
 
     if(D>=wh/2 && xy>=0 && xy<=wh){
         return (float) Img[wh]/wh; //mean of img
     }else{
-        //needed points (where to evaluate fourth integral) image to compute convolution
+        //needed points (where to evaluate the fourth integral image to compute convolution)
         double xy1,xy2,xy3,xy4,xy5,xy6,xy7,xy8;
 
-        xy1 = (double) xy + (3.*D+1.)/2.;
-        xy2 = (double) xy + (3.*D-1.)/2.;
-        xy3 = (double) xy + (D+1.)/2.;
-        xy4 = (double) xy + (D-1.)/2.;
-        xy5 = (double) xy + (1.-D)/2.;
-        xy6 = (double) xy - (1.+D)/2.;
-        xy7 = (double) xy + (1.-3.*D)/2.;
-        xy8 = (double) xy - (1.+3.*D)/2.;
+        xy1 = (double) xy + 3.*D/2. + 1.;
+        xy2 = (double) xy + 3.*D/2.;
+        xy3 = (double) xy + D/2. + 1.;
+        xy4 = (double) xy + D/2.;
+        xy5 = (double) xy - D/2. + 1.;
+        xy6 = (double) xy - D/2.;
+        xy7 = (double) xy - 3.*D/2. + 1.;
+        xy8 = (double) xy - 3.*D/2.;
 
         // a. = valeur de l'image 4-int en .
         // b. = valeur de la derivé discrète de l'image 4-int
@@ -153,13 +152,13 @@ float convolve_img(float *img,double *Img,double xy,float d,int wh){
 }
 
 
-int apply_homo(float *img,float *img_f,int w,int h,int w_f,int h_f,int mu,int nu,int mu_f,int nu_f,double H[9]){
+int apply_unidirectional_homography(float *img,float *img_f,int w,int h,int w_f,int h_f,int mu,int nu,int mu_f,int nu_f,double H[3][3]){
 /**
   * @param
   *     img, img_f : initial and final images
   *     w,h, w_f,h_f : dimensions of images
   *     mu,nu, mu_f,nu_f : position of images (in the plan)
-  *     H : homography matrix such that H[1]=H[3]=H[7]=0
+  *     H : homography matrix such that H[0][1]=H[0][3]=H[2][1]=0
   *
   * since a pixel has a size of 1, its inverse image has a size d, with d the absolute value of the derivative
   * at that point
@@ -168,7 +167,7 @@ int apply_homo(float *img,float *img_f,int w,int h,int w_f,int h_f,int mu,int nu
   *
   * Img (with uppercase) represent an integral image, while img is an image
   */
-	int l;
+    int l;
 
     //w_aux,h_aux, mu_aux,nu_aux pour l'image intermÈdiaire img_aux
     //mu_aux,nu_aux,w_aux,h_aux are the position and size of the auxiliary image
@@ -177,27 +176,26 @@ int apply_homo(float *img,float *img_f,int w,int h,int w_f,int h_f,int mu,int nu
     int mu_aux = mu_f; //the second step does not change x
     int nu_aux = nu; //the first step does not change y
 
-    float *imgw = malloc(w*sizeof(float));
-	double *Img = malloc(4*(w+1)*sizeof(double));
-	float *img_aux = malloc(w_aux*h_aux*sizeof(float));
-
-	float *img_auxh = malloc(h_aux*sizeof(float));
-    double *Img_aux = malloc(4*(h_aux+1)*sizeof(double));
+    float *column = malloc(w*sizeof(float));
+    double *Img = malloc(4*(w+1)*sizeof(double)); //successive integrals of column
+    float *img_aux = malloc(w_aux*h_aux*sizeof(float));
+	
+    float *row_aux = malloc(h_aux*sizeof(float));
+    double *Img_aux = malloc(4*(h_aux+1)*sizeof(double)); //successive integrals of row_aux
     float *img_aux2 = malloc(w_f*h_f*sizeof(float));
 
 	for(l=0;l<3;l++){
         //first step
-		for(int j=0;j<h_aux;j++){
-            for(int i=0;i<w;i++){imgw[i] = img[3*(i+j*w)+l];} //extract the column
-            build_fourth_int(imgw,Img,w);
+	    for(int j=0;j<h_aux;j++){
+            for(int i=0;i<w;i++){column[i] = img[3*(i+j*w)+l];} //extract the j-th column
+            build_fourth_int(column,Img,w);
 
 			#pragma omp parallel for schedule(static,1)
 			for(int i=0;i<w_aux;i++){
-				float x = (float) (i+mu_aux+0.5);
-                float d = fabs((H[0]*H[8]-H[6]*H[2])/pow(H[6]*x+H[8],2)); //derivative with respect to x
-
-				x = (H[0]*x+H[2])/(H[6]*x+H[8]) - (float) mu; //apply the homography
-				img_aux[i+j*w_aux] = convolve_img(imgw,Img,x,d,w);
+				float x = (float) (i+mu_aux);
+                float d = fabs((H[0][0]*H[2][2]-H[2][0]*H[0][2])/pow(H[2][0]*x+H[2][2],2)); //derivative with respect to x
+				x = (H[0][0]*x+H[0][2])/(H[2][0]*x+H[2][2]) - (float) mu; //apply the homography
+				img_aux[i+j*w_aux] = convolve_img(column,Img,x,d,w);
 			}
 		}
 
@@ -205,24 +203,30 @@ int apply_homo(float *img,float *img_f,int w,int h,int w_f,int h_f,int mu,int nu
 
 		//second step
 		for(int i=0;i<w_f;i++){
-            for(int j=0;j<h_aux;j++){img_auxh[j] = img_aux[i+j*w_aux];} //extract the line
-            build_fourth_int(img_auxh,Img_aux,h_aux);
+			for(int j=0;j<h_aux;j++){row_aux[j] = img_aux[i+j*w_aux];} //extract the i-th row
+			build_fourth_int(row_aux,Img_aux,h_aux);
 
-			float x =(float) (i+mu_f+0.5);
-			float d = fabs(H[4]/(H[6]*x+H[8])); //derivative with respect to y (does not depend on y)
+			float x =(float) (i+mu_f);
+			float d = fabs(H[1][1]/(H[2][0]*x+H[2][2])); //derivative with respect to y (does not depend on y)
 
 			#pragma omp parallel for schedule(static,1)
 			for(int j=0;j<h_f;j++){
-				float y = (float) (j+nu_f+0.5);
-				y = (H[4]*y+H[5])/(H[6]*x+H[8]) - (float) nu_aux; //apply the homography
-				img_aux2[i+j*w_f] = convolve_img(img_auxh,Img_aux,y,d,h_aux);
-
+				float y = (float) (j+nu_f);
+				y = (H[1][1]*y+H[1][2])/(H[2][0]*x+H[2][2]) - (float) nu_aux; //apply the homography
+				img_aux2[i+j*w_f] = convolve_img(row_aux,Img_aux,y,d,h_aux);
 			}
 		}
 
+
+
+		//output
 		for(int i=0;i<w_f*h_f;i++){img_f[3*i+l]=img_aux2[i];}
-
 	}
-
+	free(column);
+	free(Img);
+	free(img_aux);
+	free(row_aux);
+	free(Img_aux);
+	free(img_aux2);
 	return 0;
 }

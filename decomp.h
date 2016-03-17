@@ -6,21 +6,23 @@
 #include "affine.h"
 #include "homo_box.h"
 
+
 /**
   * how are indexed coefficients of matrices :
   *
   * for the homographies
-  * 0 1 2
-  * 3 4 5
-  * 6 7 8
+  * 0,0   0,1   0,2
+  * 1,0   1,1   1,2
+  * 2,0   2,1   2,2
   *
-  * for the affinities
-  * 0 1 2
-  * 3 4 5
+  * for the affine maps
+  * 0,0   0,1   0,2
+  * 1,0   1,1   1,2
   */
 
-//y = H(x)
-static void apply_homography(double y[2], double H[3][3], double x[2])
+
+
+static void apply_homography_1pt_aux(double y[2], double H[3][3], double x[2])
 {
 	double X = H[0][0] * x[0] + H[0][1] * x[1] + H[0][2];
 	double Y = H[1][0] * x[0] + H[1][1] * x[1] + H[1][2];
@@ -30,7 +32,9 @@ static void apply_homography(double y[2], double H[3][3], double x[2])
 }
 
 
-void smallestRectangle(double A[6], int wIn, int hIn, int *muOut, int *nuOut, int *wOut, int *hOut){
+
+// compute the smallest rectangle containing the result of an affine mapping
+void smallest_rectangle(double A[2][3], int wIn, int hIn, int *muOut, int *nuOut, int *wOut, int *hOut){
 /**
   * @param
   *     A an affine map
@@ -38,21 +42,21 @@ void smallestRectangle(double A[6], int wIn, int hIn, int *muOut, int *nuOut, in
   *     [muOut,muOut+wOut]*[nuOut,nuOut+hOut] an output rectangle
   *
   * @return
-  *     [muOut,muOut+wOut]*[nuOut,nuOut+hOut] is the smallest rectangle (with integer-coordinated summits) containing A([0,wIn]*[0,hIn])
+  *     [muOut,muOut+wOut]*[nuOut,nuOut+hOut] is the smallest rectangle (with integer-coordinated vertices) containing A([0,wIn]*[0,hIn])
   *     (rectangle starting at (muOut,nuOut) with dimensions wOut*hOut)
   */
-    //summits of the rectangle [0,wIn]*[0,hIn]
+    //vertices of the rectangle [0,wIn]*[0,hIn]
     double xIn[4] = {0,wIn,wIn,0};
     double yIn[4] = {0,0,hIn,hIn};
-    //summits of the parallelogram A([0,wIn]*[0,hIn])
+    //vertices of the parallelogram A([0,wIn]*[0,hIn])
     double xOut[4];
     double yOut[4];
     for(int k=0;k<4;k++){
-        xOut[k]=xIn[k]*A[0]+yIn[k]*A[1]+A[2];
-        yOut[k]=xIn[k]*A[3]+yIn[k]*A[4]+A[5];
+        xOut[k]=xIn[k]*A[0][0]+yIn[k]*A[0][1]+A[0][2];
+        yOut[k]=xIn[k]*A[1][0]+yIn[k]*A[1][1]+A[1][2];
     }
 
-    //extrema of the coordinates of the output rectangle
+    //extrema of the coordinates of the output rectangle's vertices
     double xOutMin_double = xOut[0];
     double yOutMin_double = yOut[0];
     double xOutMax_double = xOut[0];
@@ -76,15 +80,15 @@ void smallestRectangle(double A[6], int wIn, int hIn, int *muOut, int *nuOut, in
 }
 
 
-// H = A H0 B
-void decomp(double H[9],double A[6],double H0[9],double B[6]){
+// decompose H in H = A H0 B
+void decomp(double H[3][3],double A[2][3],double H0[3][3],double B[2][3]){
 /**
   * @param
   *     H an input homography
   *		H0 an output homography
   *		A,B output affinities
   */
-    double a=H[0], b=H[1], p=H[2], c=H[3], d=H[4], q=H[5], r=H[6], s=H[7], t=H[8];
+    double a=H[0][0], b=H[0][1], p=H[0][2], c=H[1][0], d=H[1][1], q=H[1][2], r=H[2][0], s=H[2][1], t=H[2][2];
     double t0, t1;
 	//assume r,s != 0,0
 
@@ -109,36 +113,36 @@ void decomp(double H[9],double A[6],double H0[9],double B[6]){
 
 
 
-    double Nphi = sqrt(pow(r,2.)+pow(s,2.));
-    B[0] = r/Nphi;
-	B[1] = s/Nphi;
-	B[2] = 0.;
-	B[3] = -s/Nphi;
-	B[4] = r/Nphi;
-	B[5] = 0.;
+    double N_phi = sqrt(pow(r,2.)+pow(s,2.));
+    B[0][0] = r/N_phi;
+	B[0][1] = s/N_phi;
+	B[0][2] = 0.;
+	B[1][0] = -s/N_phi;
+	B[1][1] = r/N_phi;
+	B[1][2] = 0.;
 
-    double Npsi = sqrt(pow(a*s-b*r,2.)+pow(c*s-d*r,2.));
-	A[0] = (c*s-d*r)/Npsi;
-	A[1] = (a*s-b*r)/Npsi;
-	A[2] = -t0;
-	A[3] = -(a*s-b*r)/Npsi;
-	A[4] = (c*s-d*r)/Npsi;
-	A[5] = -t1;
+    double N_psi = sqrt(pow(a*s-b*r,2.)+pow(c*s-d*r,2.));
+	A[0][0] = (c*s-d*r)/N_psi;
+	A[0][1] = (a*s-b*r)/N_psi;
+	A[0][2] = -t0;
+	A[1][0] = -(a*s-b*r)/N_psi;
+	A[1][1] = (c*s-d*r)/N_psi;
+	A[1][2] = -t1;
 
-    H0[0] = -(a*d-b*c)*Nphi/Npsi;
-    H0[1] = 0.;
-    H0[2] = (p*(c*s-d*r)-q*(a*s-b*r))/Npsi;
-    H0[3] = 0.;
-    H0[4] = -Npsi/Nphi;
-    H0[5] = (p*(a*s-b*r)+q*(c*s-d*r))/Npsi;
-    H0[6] = Nphi;
-    H0[7] = 0.;
-    H0[8] = t;
+    H0[0][0] = -(a*d-b*c)*N_phi/N_psi;
+    H0[0][1] = 0.;
+    H0[0][2] = (p*(c*s-d*r)-q*(a*s-b*r))/N_psi;
+    H0[1][0] = 0.;
+    H0[1][1] = -N_psi/N_phi;
+    H0[1][2] = (p*(a*s-b*r)+q*(c*s-d*r))/N_psi;
+    H0[2][0] = N_phi;
+    H0[2][1] = 0.;
+    H0[2][2] = t;
 
 }
 
 
-void apply_homo_final(float *img,float *img_f,int w,int h,int w_f,int h_f,double H[3][3]){
+void apply_homography(float *img,float *img_f,int w,int h,int w_f,int h_f,double H[3][3]){
 
 /**
   * @param
@@ -149,85 +153,80 @@ void apply_homo_final(float *img,float *img_f,int w,int h,int w_f,int h_f,double
   *     H : inverse homography, such that img_f(x,y)=img(H(x,y))
   */
 
-
-	double *a = *H;
-
-	if(a[8]!=0 && a[6]/a[8]==0 && a[7]/a[8]==0){    //H is an affinity
-		double A[6] = {
-            a[0]/a[8], a[1]/a[8], a[2]/a[8],
-            a[3]/a[8], a[4]/a[8], a[5]/a[8]
-        };
-		apply_affinity(img,img_f,w,h,w_f,h_f,A);
+	if(H[2][2]!=0 && H[2][0]/H[2][2]==0 && H[2][1]/H[2][2]==0){    //H is an affine map
+		double A[2][3] = {
+			H[0][0]/H[2][2], H[0][1]/H[2][2], H[0][2]/H[2][2],
+			H[1][0]/H[2][2], H[1][1]/H[2][2], H[1][2]/H[2][2]};
+		apply_affine_map(img,img_f,w,h,w_f,h_f,A);
 	}else{  //H is an homography
-		double A[6];
-		double H0[9];
-		double B[6];
+		double A[2][3];
+		double H0[3][3];
+		double B[2][3];
 
-		decomp(a,A,H0,B);   //compute the decomposition H = A H0 B
+		decomp(H,A,H0,B);   //compute the decomposition H = A H0 B
 
 
 
-        //declare the size (w,h) and the position (mu,nu) of every intermediate image
-        /*
-         * For an image at the position (mu,nu), the coordinates of the (i,j)-th pixel are (i+mu,j+nu)
-         * rectangleX is the rectangle of the plan [muX,muX+wX]*[nuX,nuX+hX] containing imgX
-         * Thus, rectangle1 is the input image and rectangle_f is the output image
-         *
-         *
-         * img1 is the input image (mu1=nu1=0, w1=w, h1=h)
-         * img2 and img3 are the intermediate images
-         * img4 is the output image (mu4=nu4=0, w4=w_f, h4=h_f)
-         */
-        int mu2,nu2,w2,h2,
-            mu3,nu3,w3,h3;
+		//declare the size (w,h) and the position (mu,nu) of every intermediate image
+		/*
+		 * For an image at the position (mu,nu), the coordinates of the (i,j)-th pixel are (i+mu,j+nu)
+		 * rectangleX is the rectangle of the plan [muX,muX+wX]*[nuX,nuX+hX] containing imgX
+		 * Thus, rectangle1 is the input image and rectangle_f is the output image
+		 *
+		 *
+		 * img1 is the input image (mu1=nu1=0, w1=w, h1=h)
+		 * img2 and img3 are the intermediate images
+		 * img4 is the output image (mu4=nu4=0, w4=w_f, h4=h_f)
+		 */
+		int mu2,nu2,w2,h2,
+			mu3,nu3,w3,h3;
 
 		//rectangle2 = invA(rectangle1) where invA = A^(-1)
-		double det_A = A[0]*A[4]-A[3]*A[1];
-        double invA[6] = {
-            A[4]/det_A,
-            -A[1]/det_A,
-            (A[1]*A[5]-A[4]*A[2])/det_A,
-            -A[3]/det_A,
-            A[0]/det_A,
-            (-A[0]*A[5]+A[3]*A[2])/det_A
-        };
-        smallestRectangle(invA,w,h,&mu2,&nu2,&w2,&h2);
-        if((w2-w)%2!=0){w2++;}  //w2 must have the same parity than w
-        if((h2-h)%2!=0){h2++;}  //h2 must have the same parity than h
+		double detA = A[0][0]*A[1][1]-A[1][0]*A[0][1];
+		double invA[2][3] = {
+			A[1][1]/detA,
+			-A[0][1]/detA,
+			(A[0][1]*A[1][2]-A[1][1]*A[0][2])/detA,
+			-A[1][0]/detA,
+			A[0][0]/detA,
+			(-A[0][0]*A[1][2]+A[1][0]*A[0][2])/detA};
+		smallest_rectangle(invA,w,h,&mu2,&nu2,&w2,&h2);
+		if((w2-w)%2!=0){w2++;}  //w2 must have the same parity than w
+		if((h2-h)%2!=0){h2++;}  //h2 must have the same parity than h
 
-        //rectangle3 = B(rectangle4)
-        smallestRectangle(B,w_f,h_f,&mu3,&nu3,&w3,&h3);
-        if((w3-w_f)%2!=0){w3++;}    //w3 must have the same parity than w_f
-        if((h3-h_f)%2!=0){h3++;}    //h3 must have the same parity than h_f
-
-
-
-        //the affinities must be corrected so that they fit the positions of the rectangles
-        /*
-         * the exact formulas are
-         * A[2] = mu2*A[0] + nu2*A[1] + A[2] - mu1;
-         * A[5] = mu2*A[3] + nu2*A[4] + A[5] - nu1;
-         * B[2] = mu4*B[0] + nu4*B[1] + B[2] - mu3;
-         * B[5] = mu4*B[3] + nu4*B[4] + B[5] - nu3;
-         * but a lot of term are zero
-         */
-        A[2] = mu2*A[0] + nu2*A[1] + A[2];
-        A[5] = mu2*A[3] + nu2*A[4] + A[5];
-        B[2] = - mu3;
-        B[5] = - nu3;
+		//rectangle3 = B(rectangle4)
+		smallest_rectangle(B,w_f,h_f,&mu3,&nu3,&w3,&h3);
+		if((w3-w_f)%2!=0){w3++;}    //w3 must have the same parity than w_f
+		if((h3-h_f)%2!=0){h3++;}    //h3 must have the same parity than h_f
 
 
 
-        ///Application of the decomposition
+		//the affinities must be corrected so that they fit the positions of the rectangles
+		/*
+		 * the exact formulas are
+		 * A[0][2] = mu2*A[0][0] + nu2*A[0][1] + A[0][2] - mu1;
+		 * A[1][2] = mu2*A[1][0] + nu2*A[1][1] + A[1][2] - nu1;
+		 * B[0][2] = mu4*B[0][0] + nu4*B[0][1] + B[0][2] - mu3;
+		 * B[1][2] = mu4*B[1][0] + nu4*B[1][1] + B[1][2] - nu3;
+		 * but a lot of term are zero
+		 */
+		A[0][2] = mu2*A[0][0] + nu2*A[0][1] + A[0][2];
+		A[1][2] = mu2*A[1][0] + nu2*A[1][1] + A[1][2];
+		B[0][2] = - mu3;
+		B[1][2] = - nu3;
 
-        float *img2 = malloc(3*w2*h2*sizeof(float));
-		apply_affinity(img,img2,w,h,w2,h2,A);
+
+
+		///Application of the decomposition
+
+		float *img2 = malloc(3*w2*h2*sizeof(float));
+		apply_affine_map(img,img2,w,h,w2,h2,A);
 
 		float *img3 = malloc(3*w3*h3*sizeof(float));
-		apply_homo(img2,img3,w2,h2,w3,h3,mu2,nu2,mu3,nu3,H0);
+		apply_unidirectional_homography(img2,img3,w2,h2,w3,h3,mu2,nu2,mu3,nu3,H0);
 		free(img2);
 
-		apply_affinity(img3,img_f,w3,h3,w_f,h_f,B);
+		apply_affine_map(img3,img_f,w3,h3,w_f,h_f,B);
 		free(img3);
 	}
 
@@ -238,9 +237,9 @@ void apply_homo_final(float *img,float *img_f,int w,int h,int w_f,int h_f,double
 	for(int i=0;i<w_f;i++){
 		for(int j=0;j<h_f;j++){
 			p[0]=i; p[1]=j;
-			apply_homography(p,H,p);
-			p[0] = (p[0] - 0.5) * w / (w - 1.0);
-			p[1] = (p[1] - 0.5) * h / (h - 1.0);
+			apply_homography_1pt_aux(p,H,p);
+			//p[0] = (p[0] - 0.5) * w / (w - 1.0);
+			//p[1] = (p[1] - 0.5) * h / (h - 1.0);
 			if(p[0]<0 || p[0]>w || p[1]<0 || p[1]>h){
 				for(int l=0;l<3;l++){img_f[(j*w_f+i)*3+l]=0;}
 			}

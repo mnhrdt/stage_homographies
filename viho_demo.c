@@ -238,10 +238,10 @@ static void warp_homography_generic(float *y, int yw, int yh, double H[3][3],
 	for (int j = 0; j < yh; j++)
 	for (int i = 0; i < yw; i++)
 	{
-		double p[2] = {i, j};
+		float p[2] = {i, j};
 		apply_homography(p, H, p);
-		p[0] += 1.0;
-		p[1] += 1.0;
+		//p[0] += 1.0;
+		//p[1] += 1.0;
 		//p[0] = p[0] * w / (w - 1.0) - 0.5;
 		//p[1] = p[1] * h / (h - 1.0) - 0.5;
 		for (int l = 0; l < pd; l++)
@@ -363,6 +363,17 @@ int main(int argc,char *argv[])
 	double debutreal,finreal;
 	debutcpu = clock();
 	debutreal = omp_get_wtime();
+//	if(pd==3){
+//        apply_homography(img,img_f,w,h,WOUT,HOUT,H);
+//	}else{//suppose pd=1
+//        float *img3 = malloc(3*w*h*sizeof(float));
+//        for(int i=0;i<w*h;i++){
+//            for(int l = 0;l<3;l++){
+//                img3[3*i+l]=img[i];
+//            }
+//        }
+//        apply_homography(img3,img_f,w,h,WOUT,HOUT,H);
+//	}
 
 	// call the actual algorithm
 	omp_set_num_threads(16);

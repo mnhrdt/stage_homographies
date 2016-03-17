@@ -1,4 +1,4 @@
-//gcc-5 -fopenmp -O3 viho.c -I/usr/local/include/libiomp -I/usr/X11/include -I/Users/Hhhh/ENS/Stage_L3_math/homographies/code/jpeg-6b -L/usr/X11/lib -lfftw3 -lX11 -L/usr/local/Cellar/libtiff/4.0.3 -ltiff -ljpeg -lpng
+//gcc-5 -fopenmp -O3 viho_alt.c -I/usr/local/include/libiomp -I/usr/X11/include -I/Users/Hhhh/ENS/Stage_L3_math/homographies/code/jpeg-6b -L/usr/X11/lib -lfftw3 -lX11 -L/usr/local/Cellar/libtiff/4.0.3 -ltiff -ljpeg -lpng
 
 
 #include "iio.c"
@@ -10,6 +10,7 @@
 
 #define WOUT 512
 #define HOUT 512
+
 
 
 int main(int argc,char *argv[]){
@@ -44,7 +45,7 @@ int main(int argc,char *argv[]){
 	debutcpu = clock();
 	debutreal = omp_get_wtime();
 	if(pd==3){
-        apply_homo_final(img,img_f,w,h,WOUT,HOUT,H);
+        apply_homography(img,img_f,w,h,WOUT,HOUT,H);
 	}else{//suppose pd=1
         float *img3 = malloc(3*w*h*sizeof(float));
         for(int i=0;i<w*h;i++){
@@ -52,7 +53,7 @@ int main(int argc,char *argv[]){
                 img3[3*i+l]=img[i];
             }
         }
-        apply_homo_final(img3,img_f,w,h,WOUT,HOUT,H);
+        apply_homography(img3,img_f,w,h,WOUT,HOUT,H);
 	}
 	
 	fincpu = clock();

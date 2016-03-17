@@ -6,39 +6,17 @@
 #include "umax_vmax.h"
 
 /**
-  * how are indexed coefficients of matrices :
-  * for the affinities :
-  * 0 1 2
-  * 3 4 5
+  * how are indexed coefficients of affine maps' matrices :
+  * 0,0   0,1   0,2
+  * 1,0   1,1   1,2
   *
   * the image is supposed to have three level of colors
   */
 
-//the filter zero for x not in [-TAPS,TAPS]
-#define TAPS 4
-
-#define FILTER_TYPE 0 //the index to change the interpolation filter
-//list of possible index for interpolation filters
-#define RAISED_COSINE 0
-#define GAUSSIAN 1
-
-//parameters of filters
-#define VARIANCE 0.36 //variance of the gaussian
-#define PERIOD 1. //period of the raised cosine
-#define BETA 0.36 //roll-off factor of the raised cosine
-
-//precision of the computation
-#define PREC 10 //the precomputation of the values of the filter will be at precision 2^(-PREC)
-#define PREC2 20 //an equality will be at precision 2^(-PREC2)
-#define PI 3.14159265358979323
-
-//a relaxed equality on doubles
-bool eq(double a,double b){if(a<b+pow(2,-PREC2)&& a>b-pow(2,-PREC2)){return true;}{return false;}}
 
 
-
-//transpose A and img if necessary (to avoid bottleneck problem)
-void transpo_opt(float *img,double *a,int wh[2]){
+//optional transposition : transpose A and img if necessary (to avoid bottleneck problem)
+void opt_transpo(float *img,double a[2][3],int wh[2]){
 /**
   * @param
   *		img an image
@@ -46,18 +24,18 @@ void transpo_opt(float *img,double *a,int wh[2]){
   */
   	//normalize the linear part of a
 	double c1,c2;
-	c1 = sqrt(pow(a[0],2)+pow(a[1],2));
-	c2 = sqrt(pow(a[3],2)+pow(a[4],2));
+	c1 = sqrt(pow(a[0][0],2)+pow(a[0][1],2));
+	c2 = sqrt(pow(a[1][0],2)+pow(a[1][1],2));
 	double a0,a1,a3,a4;
-	a1=fabs(a[1])/c1; a0=fabs(a[0])/c1; a3=fabs(a[3])/c2; a4=fabs(a[4])/c2;
+	a1=fabs(a[0][1])/c1; a0=fabs(a[0][0])/c1; a3=fabs(a[1][0])/c2; a4=fabs(a[1][1])/c2;
 	if(a0+a4<a1+a3){ //transposition is necessary
 		int w = wh[0];
 		int h = wh[1];
 
 		//transpose A
-		double aa[6];
-		aa[0]=a[3]; aa[1]=a[4]; aa[2]=a[5]; aa[3]=a[0]; aa[4]=a[1]; aa[5]=a[2];
-		a[0]=aa[0]; a[1]=aa[1]; a[2]=aa[2]; a[3]=aa[3]; a[4]=aa[4]; a[5]=aa[5];
+		double aa[2][3];
+		aa[0][0]=a[1][0]; aa[0][1]=a[1][1]; aa[0][2]=a[1][2]; aa[1][0]=a[0][0]; aa[1][1]=a[0][1]; aa[1][2]=a[0][2];
+		a[0][0]=aa[0][0]; a[0][1]=aa[0][1]; a[0][2]=aa[0][2]; a[1][0]=aa[1][0]; a[1][1]=aa[1][1]; a[1][2]=aa[1][2];
 
 		//transpose img
 		float *img_t = malloc(3*w*h*sizeof(float));
@@ -77,17 +55,12 @@ void transpo_opt(float *img,double *a,int wh[2]){
 
 //the filter function
 float filter_fun(float x){
-    switch(FILTER_TYPE){
-    case GAUSSIAN:
-        return exp(-pow(x,2)/(2*VARIANCE));
-        break;
-    case RAISED_COSINE:
-    default:
-        if(eq(x,0)){return 1.;}
-        else if(eq(fabs(x),PERIOD/2./BETA)){return BETA/2.*sin(PI/2./BETA);}
-        else{return sin(PI*x/PERIOD)/(PI*x/PERIOD)*cos(PI*BETA*x/PERIOD)/(1.-pow(2.*BETA*x/PERIOD,2));}
-        break;
-    }
+	//the function is a raised cosine-weighted sinc
+	if(eq(x,0)){return 1.;}
+	else if(eq(fabs(x),PERIOD/2./BETA)){return BETA/2.*sin(PI/2./BETA);}
+	else{return sin(PI*x/PERIOD)/(PI*x/PERIOD)*cos(PI*BETA*x/PERIOD)/(1.-pow(2.*BETA*x/PERIOD,2));}
+	//in case one may want to use a gaussian function :
+	//return exp(-pow(x,2)/(2*VARIANCE));
 }
 
 
@@ -116,7 +89,7 @@ float filter_h(float *img,int w,int h,double xc_i,double yc_i,double xc_f,double
     //convolution
 	float tot = 0;
 	for(int u = k-N<0?0:k-N;u<=k+N && u<w;u++){
-	       tot += H[(k-u)*prec + p + N*prec]*img[(u+j*w)*3+l];
+		tot += H[(k-u)*prec + p + N*prec]*img[(u+j*w)*3+l];
 	}
 
     return tot;
@@ -173,7 +146,7 @@ int apply_rh(float *img1,float *img2,int w,int h,double xc_i,double yc_i,double 
 
 
 	//declare H (will contain precomputed values of the filter function)
-	int N = ceil(abs(s*TAPS));
+	int N = ceil(abs(s*SUPP));
 	int prec = pow(2,PREC);
 	float precf = (float) prec;
 	float *H = malloc((2*N+1)*prec*sizeof(float));
@@ -184,7 +157,7 @@ int apply_rh(float *img1,float *img2,int w,int h,double xc_i,double yc_i,double 
 		float Htot = 0;
 		float pf = (float) p;
 		for(int k=-N;k<=N;k++){
-                float kf = (float) k;
+            float kf = (float) k;
 			Htot += H[k*prec + p + N*prec] = filter_fun((kf+pf/precf)/s); //s>=1 increase the width of the filter
 		}
 		for(int k=-N;k<=N;k++){H[k*prec + p + N*prec] = H[k*prec + p + N*prec]/Htot;} //normalize the filter for each p
@@ -194,7 +167,7 @@ int apply_rh(float *img1,float *img2,int w,int h,double xc_i,double yc_i,double 
 	#pragma omp parallel for schedule(static,1)
 	for(int j=0;j<h;j++){
 		for(int i=0;i<w;i++){
-		double x = i;
+			double x = i;
 			for(int l=0;l<3;l++){
 				img2[(i+j*w)*3 + l] = filter_h(img1,w,h,xc_i,yc_i,xc_f,yc_f,H,N,prec,a0,a1,x,j,l);
 			}
@@ -224,7 +197,7 @@ int apply_rv(float *img1,float *img2,int w,int h,double xc_i,double yc_i,double 
 
 
     //declare H (will contain precomputed values of the filter function)
-	int N = ceil(abs(s*TAPS));
+	int N = ceil(abs(s*SUPP));
 	int prec = pow(2,PREC);
 	float sf = (float) s;
 	float precf = (float) prec;
@@ -258,8 +231,8 @@ int apply_rv(float *img1,float *img2,int w,int h,double xc_i,double yc_i,double 
 
 
 
-//apply an affinity
-int apply_affinity(float *img,float *img_f,int w,int h,int w_f,int h_f,double *a){
+//apply an affine map
+int apply_affine_map(float *img,float *img_f,int w,int h,int w_f,int h_f,double a[2][3]){
 /**
   * @param
   *     img, img_f : initial and final images
@@ -267,23 +240,23 @@ int apply_affinity(float *img,float *img_f,int w,int h,int w_f,int h_f,double *a
   *     a : the inverse affinity to apply (img_f(x)=img(a(x)))
   */
 	/*
-	 * the following call to the function transpo_opt will possibly change img and a
+	 * the following call to the function opt_transpo will possibly change img and a
 	 * -->  if the user wants to use multi-pass resampling method for other purposes than
 	 *      the decomposition, he may want to copy img and a and work on those copies
 	 *      else, the previous content of img and a might be deleted
 	 */
 	//transpose img and a if necessary
 	int wh[2] = {w,h};
-	transpo_opt(img,a,wh);
+	opt_transpo(img,a,wh);
 	w=wh[0];
 	h=wh[1];
 
     //compute maximal preserved frequencies u_max and v_max
 	double umax,vmax;
-	double A[2][2] = {a[0],a[1],a[3],a[4]};
+	double A[2][2] = {a[0][0],a[0][1],a[1][0],a[1][1]}; //linear part of a
     int test = umax_vmax(&umax,&vmax,A);  //in "umax_vmax.h"
     if(test==1){
-        printf("@apply_affinity : error dans umax_vmax\n");
+        printf("@apply_affine_map : error dans umax_vmax\n");
         exit(1);
     }
 
@@ -302,7 +275,7 @@ int apply_affinity(float *img,float *img_f,int w,int h,int w_f,int h_f,double *a
 	float *img1 = malloc(3*9*ww*hh*sizeof(float));
 	float *img2 = malloc(3*9*ww*hh*sizeof(float));
 	if(img1==NULL || img2==NULL){
-        printf("apply_affinity : img1 et img2 have not been created");
+        printf("apply_affine_map : img1 et img2 have not been created");
         exit(1);
     }
 
@@ -326,10 +299,10 @@ int apply_affinity(float *img,float *img_f,int w,int h,int w_f,int h_f,double *a
 
 
 	//compute values to decompose a in shears
-	double b0 = a[0] - a[1]*a[3]/a[4];
-	double t2 = a[2] - a[1]*a[5]/a[4];
-	double rv = fmin(3, fmax(1, fabs(a[1])*umax + fmin(1, fabs(a[4])*vmax)));
-    double rh = fmin(3, fmax(1, fabs(a[3]/a[4])*rv*vmax + fmin(1, fabs(b0)*umax)));
+	double b0 = a[0][0] - a[0][1]*a[1][0]/a[1][1];
+	double t2 = a[0][2] - a[0][1]*a[1][2]/a[1][1];
+	double rv = fmin(3, fmax(1, fabs(a[0][1])*umax + fmin(1, fabs(a[1][1])*vmax)));
+    double rh = fmin(3, fmax(1, fabs(a[1][0]/a[1][1])*rv*vmax + fmin(1, fabs(b0)*umax)));
 
 	//cast
 	double wf = (double) w, hf = (double) h;
@@ -342,22 +315,22 @@ int apply_affinity(float *img,float *img_f,int w,int h,int w_f,int h_f,double *a
 	xc_i = wf/2.;
 	yc_i = hf/2.;
 	xc_f = xc_i;
-	yc_f = rv/a[4] * yc_i;
-	apply_rv(img1,img2,3*ww,3*hh,xc_i,yc_i,xc_f,yc_f,1/vmax,a[4]/rv,0.);
+	yc_f = rv/a[1][1] * yc_i;
+	apply_rv(img1,img2,3*ww,3*hh,xc_i,yc_i,xc_f,yc_f,1/vmax,a[1][1]/rv,0.);
 
 	//second shear
 	xc_i = xc_f - t2; //translation of -t2 between the first and the second shear
 	yc_i = yc_f;
-	xc_f = rh/b0 * xc_i - a[1]/rv*rh/b0 * yc_i;
+	xc_f = rh/b0 * xc_i - a[0][1]/rv*rh/b0 * yc_i;
 	yc_f = yc_i;
-    apply_rh(img2,img1,3*ww,3*hh,xc_i,yc_i,xc_f,yc_f,1/umax,b0/rh,a[1]/rv);
+    apply_rh(img2,img1,3*ww,3*hh,xc_i,yc_i,xc_f,yc_f,1/umax,b0/rh,a[0][1]/rv);
 
     //third shear
 	xc_i = xc_f;
-	yc_i = yc_f - a[5]*rv/a[4]; //translation of -a[5]*rv/a[4] between the second and the third shear
+	yc_i = yc_f - a[1][2]*rv/a[1][1]; //translation of -a[1][2]*rv/a[1][1] between the second and the third shear
 	xc_f = xc_i;
 	yc_f = hhf/2.; //recenter on the final view
-	apply_rv(img1,img2,3*ww,3*hh,xc_i,yc_i,xc_f,yc_f,rv,rv,a[3]*rv/a[4]/rh);
+	apply_rv(img1,img2,3*ww,3*hh,xc_i,yc_i,xc_f,yc_f,rv,rv,a[1][0]*rv/a[1][1]/rh);
 
 	//last shear
 	xc_i = xc_f;

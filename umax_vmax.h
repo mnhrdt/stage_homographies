@@ -2,12 +2,11 @@
 #include <math.h>
 #include <stdlib.h>
 
-bool equals(double a,double b){
-    //if(a<b+pow(2,-PREC)&& a>b-pow(2,-PREC)){return true;}else{return false;}
-    if(a==b){return true;}else{return false;}
-}
+#include "parameters.h"
 
-//intersect a segment with vertical sides of the square [-1,1]*[-1,1]
+
+
+//intersect a segment with vertical edges of the square [-1,1]*[-1,1]
 void avi(double M[2][10], int *n, double u1, double v1, double u2, double v2){
 /**
   * @name
@@ -16,15 +15,15 @@ void avi(double M[2][10], int *n, double u1, double v1, double u2, double v2){
   *     M : array containing coordinates of n points
   *         the points are stocked between 0 and n-1
   *     P1=(u1,v1), P2=(u2,v2) : [P1,P2] is the segment to intersect
-  *         equals(u1,u2)=false
+  *         eq(u1,u2)=false
   */
-    //A et B are the intersection points between the straight lines
+    //a et b are the intersection points between the straight lines
     double ua = 1.;
     double ub = -1.;
     double va = v1+(ua-u1)*(v2-v1)/(u2-u1);
     double vb = v1+(ub-u1)*(v2-v1)/(u2-u1);
 
-    //add A and B to M iff they belongs to the intersected segments
+    //add a and b to M iff they belong to the intersected segments
     if(fabs(va)<=1. && ((u1<=ua && ua<=u2) || (u2<=ua && ua<=u1))){
         M[0][*n] = ua;
         M[1][*n] = va;
@@ -37,7 +36,7 @@ void avi(double M[2][10], int *n, double u1, double v1, double u2, double v2){
     }
 }
 
-//intersect a segment with horizontal sides of the square [-1,1]*[-1,1]
+//intersect a segment with horizontal edges of the square [-1,1]*[-1,1]
 void ahi(double M[2][10], int *n, double u1, double v1, double u2, double v2){
 /**
   * @name
@@ -46,15 +45,15 @@ void ahi(double M[2][10], int *n, double u1, double v1, double u2, double v2){
   *     M : array containing coordinates of n points
   *         the points are stocked between 0 and n-1
   *     P1=(u1,v1), P2=(u2,v2) : [P1,P2] is the segment to intersect
-  *         equals(v1,v2)=false
+  *         eq(v1,v2)=false
   */
-    //A et B are the intersection points between the straight lines
+    //a et b are the intersection points between the straight lines
     double va = 1.;
     double vb = -1.;
     double ua = u1+(va-v1)*(u2-u1)/(v2-v1);
     double ub = u1+(vb-v1)*(u2-u1)/(v2-v1);
 
-    //add A and B to M iff they belongs to the intersected segments
+    //add a and b to M iff they belong to the intersected segments
     if(fabs(ua)<=1. && ((v1<=va && va<=v2) || (v2<=va && va<=v1))){
         M[0][*n] = ua;
         M[1][*n] = va;
@@ -75,9 +74,9 @@ int umax_vmax(double *u, double *v, double A[2][2]){
   * @return
   *     1 iff error
   */
-    double det_A = A[0][0]*A[1][1]-A[0][1]*A[1][0];
+    double detA = A[0][0]*A[1][1]-A[0][1]*A[1][0];
     //a is the inverse of the transposed matrix of A
-    double a[2][2] = {A[0][0]/det_A, -A[1][0]/det_A, -A[0][1]/det_A, A[1][1]/det_A};
+    double a[2][2] = {A[0][0]/detA, -A[1][0]/detA, -A[0][1]/detA, A[1][1]/detA};
     //(u1,v1) = a(1,1)
     double u1 = a[0][0]+a[0][1], v1 = a[1][0]+a[1][1];
     //(u2,v2) = a(1,-1)
@@ -98,11 +97,11 @@ int umax_vmax(double *u, double *v, double A[2][2]){
         n++;
     }
 
-    if(equals(u1,u2)){ //the two points are vertically align ; do not call avi(M,&n,u1,v1,u2,v2);
-        if(equals(v1,v2)){ //the two points are the same point
+    if(eq(u1,u2)){ //the two points are vertically align ; do not call avi(M,&n,u1,v1,u2,v2);
+        if(eq(v1,v2)){ //the two points are the same point
             printf("@umax_vmax : A is not invertible\n");
             return 1;
-        }else if(equals(v1,-v2)){ //a([-1,1]*[-1,1]) is a rectangle
+        }else if(eq(v1,-v2)){ //a([-1,1]*[-1,1]) is a rectangle
             *u = fmin(fabs(u1),1.);
             *v = fmin(fabs(v1),1.);
             return 0;
@@ -111,11 +110,11 @@ int umax_vmax(double *u, double *v, double A[2][2]){
             ahi(M,&n,u1,v1,-u2,-v2);
             avi(M,&n,u1,v1,-u2,-u2);
         }
-    }else if(equals(u1,-u2)){ //same cases than before but with (u1,v1) and (-u2,-v2)
-        if(equals(v1,-v2)){
+    }else if(eq(u1,-u2)){ //same cases than before but with (u1,v1) and (-u2,-v2)
+        if(eq(v1,-v2)){
             printf("@umax_vmax : A is not invertible\n");
             return 1;
-        }else if(equals(v1,v2)){
+        }else if(eq(v1,v2)){
             *u = fmin(fabs(u1),1.);
             *v = fmin(fabs(v1),1.);
             return 0;
@@ -127,9 +126,9 @@ int umax_vmax(double *u, double *v, double A[2][2]){
     }else{ //general case
         avi(M,&n,u1,v1,u2,v2);
         avi(M,&n,u1,v1,-u2,-v2);
-        if(equals(v1,v2)){
+        if(eq(v1,v2)){
             ahi(M,&n,u1,v1,-u2,-v2);
-        }else if(equals(v1,-v2)){
+        }else if(eq(v1,-v2)){
             ahi(M,&n,u1,v1,u2,v2);
         }else{
             ahi(M,&n,u1,v1,u2,v1);

@@ -282,7 +282,7 @@ int main(int argc,char *argv[]){
 	double H[3][3];
 	homography_from_eight_points(H,A,B,C,D,a,b,c,d);
         //this H is such that H(A)=a, H(B)=b,...
-        //but apply_homo_final resamples by the inverse homography
+        //but apply_homography resamples by the inverse homography
 
 
 
@@ -293,7 +293,7 @@ int main(int argc,char *argv[]){
 	debutcpu = clock();
 	debutreal = omp_get_wtime();
 	if(pd==3){
-        apply_homo_final(img,img_f,w,h,w_out,h_out,H);
+        apply_homography(img,img_f,w,h,w_out,h_out,H);
 	}else{//suppose pd=1
         float *img3 = malloc(3*w*h*sizeof(float));
         for(int i=0;i<w*h;i++){
@@ -301,7 +301,7 @@ int main(int argc,char *argv[]){
                 img3[3*i+l]=img[i];
             }
         }
-        apply_homo_final(img3,img_f,w,h,w_out,h_out,H);
+        apply_homography(img3,img_f,w,h,w_out,h_out,H);
 	}
 
 	fincpu = clock();

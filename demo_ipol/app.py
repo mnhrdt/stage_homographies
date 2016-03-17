@@ -172,7 +172,11 @@ class app(base_app):
         c = eval(self.cfg['param']['c'])
         p = eval(self.cfg['param']['p'])
 
-        cmdline = ["viho_demo", "-m", str(order),
+        if (order == 1):
+            cmd = "viho_alt2"
+        else:
+            cmd = "viho_demo"
+        cmdline = [cmd, "-m", str(order),
                    "input_0.png", str(outname), str(ow), str(oh),
                            str(c[0][0]), str(c[0][1]),
                            str(c[1][0]), str(c[1][1]),
@@ -183,7 +187,7 @@ class app(base_app):
                            str(p[2][0]), str(p[2][1]),
                            str(p[3][0]), str(p[3][1])
                   ]
-        #self.wait_proc(self.run_proc(["/bin/echo", str(cmdline)]))
+        self.wait_proc(self.run_proc(["/bin/echo", str(cmdline)]))
         self.wait_proc(self.run_proc(cmdline))
 
     def update_canvas(self):
