@@ -24,6 +24,15 @@
   */
 
 
+// y = H(x)
+static void apply_homography_1pt(double y[2], double H[3][3], double x[2])
+{
+	double X = H[0][0] * x[0] + H[0][1] * x[1] + H[0][2];
+	double Y = H[1][0] * x[0] + H[1][1] * x[1] + H[1][2];
+	double Z = H[2][0] * x[0] + H[2][1] * x[1] + H[2][2];
+	y[0] = X / Z;
+	y[1] = Y / Z;
+}
 
 // compute the inverse homography (inverse of a 3x3 matrix)
 double invert_homography(double invH[3][3], double H[3][3]){
@@ -238,8 +247,8 @@ static void warp_homography_generic(float *y, int yw, int yh, double H[3][3],
 	for (int j = 0; j < yh; j++)
 	for (int i = 0; i < yw; i++)
 	{
-		float p[2] = {i, j};
-		apply_homography(p, H, p);
+		double p[2] = {i, j};
+		apply_homography_1pt(p, H, p);
 		//p[0] += 1.0;
 		//p[1] += 1.0;
 		//p[0] = p[0] * w / (w - 1.0) - 0.5;
@@ -275,7 +284,7 @@ static void warp_homography_dots(float *y, int yw, int yh, double H[3][3],
 	for (int l = 0; l < pd; l++)
 	{
 		double xpos[2] = {i, j};
-		double ypos[2]; apply_homography(ypos, invH, xpos);
+		double ypos[2]; apply_homography_1pt(ypos, invH, xpos);
 		int ii = round(ypos[0]);
 		int jj = round(ypos[1]);
 		int xidx = (j * w + i) * pd + l;
@@ -289,18 +298,7 @@ static void warp_homography(float *img, float *img_f, int w, int h, int pd,
 		int ow, int oh, double H[3][3], int method_id)
 {
 	if (method_id == 1) { // decomposition method
-		if (pd == 3) {
-			apply_homo_final(img,img_f,w,h,ow,oh,H);
-		} else { //suppose pd=1
-			assert(pd == 1);
-			float *img3 = malloc(3*w*h*sizeof(float));
-			for(int i=0;i<w*h;i++){
-				for(int l = 0;l<3;l++){
-					img3[3*i+l] = img[i];
-				}
-			}
-			apply_homo_final(img3,img_f,w,h,ow,oh,H);
-		}
+		exit(fprintf(stderr, "decomposintion not here"));
 	} else if (method_id == -1) { // positions of the samples
 		warp_homography_dots(img_f, ow, oh, H, img, w, h, pd);
 	} else if (method_id == 0) { // nearest neighbor interpolation
