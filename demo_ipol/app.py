@@ -173,20 +173,31 @@ class app(base_app):
         p = eval(self.cfg['param']['p'])
 
         if (order == 1):
-            cmd = "viho_alt2"
+            cmd = "warp_decomp_ripmap"
+            cmdline = [cmd, "input_0.png",
+                       str(c[0][0]), str(c[0][1]),
+                       str(c[1][0]), str(c[1][1]),
+                       str(c[2][0]), str(c[2][1]),
+                       str(c[3][0]), str(c[3][1]),
+                       str(p[0][0]), str(p[0][1]),
+                       str(p[1][0]), str(p[1][1]),
+                       str(p[2][0]), str(p[2][1]),
+                       str(p[3][0]), str(p[3][1]),
+                       str(ow), str(oh)
+                      ]
         else:
             cmd = "viho_demo"
-        cmdline = [cmd, "-m", str(order),
-                   "input_0.png", str(outname), str(ow), str(oh),
-                           str(c[0][0]), str(c[0][1]),
-                           str(c[1][0]), str(c[1][1]),
-                           str(c[2][0]), str(c[2][1]),
-                           str(c[3][0]), str(c[3][1]),
-                           str(p[0][0]), str(p[0][1]),
-                           str(p[1][0]), str(p[1][1]),
-                           str(p[2][0]), str(p[2][1]),
-                           str(p[3][0]), str(p[3][1])
-                  ]
+            cmdline = [cmd, "-m", str(order),
+                       "input_0.png", str(outname), str(ow), str(oh),
+                       str(c[0][0]), str(c[0][1]),
+                       str(c[1][0]), str(c[1][1]),
+                       str(c[2][0]), str(c[2][1]),
+                       str(c[3][0]), str(c[3][1]),
+                       str(p[0][0]), str(p[0][1]),
+                       str(p[1][0]), str(p[1][1]),
+                       str(p[2][0]), str(p[2][1]),
+                       str(p[3][0]), str(p[3][1])
+                      ]
         self.wait_proc(self.run_proc(["/bin/echo", str(cmdline)]))
         self.wait_proc(self.run_proc(cmdline))
 
